@@ -114,7 +114,7 @@ export default {
         !url.pathname.startsWith("/_migration/")
       ) {
         // Only the frontend build is an asset source; database and uploads never are.
-        return env.ASSETS.fetch(request);
+        const asset = await env.ASSETS.fetch(request); if (asset.status !== 404 || url.pathname.includes(".")) return asset; return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
       }
       if (
         !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
