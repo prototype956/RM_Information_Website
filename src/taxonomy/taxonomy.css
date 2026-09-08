@@ -1,0 +1,273 @@
+.classification-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.classification-fields .field {
+  margin: 0;
+}
+.resource-form .classification-fields,
+.resource-form .tag-picker {
+  margin-bottom: 24px;
+}
+.classification-fields .taxonomy-field-note,
+.classification-fields > .error-box {
+  grid-column: 1/-1;
+}
+.taxonomy-field-note {
+  font-size: 12px;
+  color: #a1a1aa;
+  line-height: 1.7;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.taxonomy-field-note a {
+  color: #ccff00;
+}
+.tag-picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.tag-picker > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tag-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tag-chips:empty {
+  display: none;
+}
+.tag-chips [data-slot="badge"] {
+  padding: 0 0 0 12px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tag-chips button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.tag-input-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.tag-input-row input {
+  min-width: 0;
+  flex: 1;
+}
+.tag-input-row > button {
+  height: 44px;
+  width: 44px;
+  flex-shrink: 0;
+}
+.tag-options {
+  border: 1px solid #49494f;
+  background: #202023;
+  padding: 6px;
+  border-radius: 8px;
+  max-height: 250px;
+  overflow: auto;
+}
+.tag-options button {
+  display: flex;
+  justify-content: start;
+  width: 100%;
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.tag-options button[aria-selected="true"] {
+  background: #313326;
+  color: #ccff00;
+}
+.tag-options p,
+.tag-picker > small {
+  color: #a1a1aa;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.tag-options p {
+  padding: 12px;
+}
+.road-editor-outline .classification-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+.taxonomy-page {
+  max-width: 1100px;
+  margin: auto;
+}
+.request-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.request-title [data-variant="destructive"] {
+  color: #080808;
+}
+.request-row p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.request-pagination {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 24px;
+}
+.tag-request-link {
+  font-size: 13px;
+  color: #ccff00;
+}
+.taxonomy-dialog form textarea {
+  min-height: 100px;
+}
+.taxonomy-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 24px 0;
+}
+.taxonomy-toolbar input {
+  flex: 1;
+  min-width: 180px;
+}
+.taxonomy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.taxonomy-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border: 1px solid #343438;
+  background: #18181b;
+  border-radius: 8px;
+}
+.taxonomy-row > div:first-child {
+  min-width: 0;
+}
+.taxonomy-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.taxonomy-row small {
+  color: #a1a1aa;
+  font-size: 12px;
+}
+.taxonomy-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.taxonomy-page button,
+.taxonomy-page [role="tab"] {
+  min-height: 44px;
+}
+.taxonomy-page [role="tablist"] {
+  height: auto;
+}
+.taxonomy-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.taxonomy-impact {
+  border: 1px solid #695f42;
+  padding: 14px;
+  border-radius: 8px;
+  background: #28251c;
+  line-height: 1.8;
+  color: #ead9ae;
+  font-size: 13px;
+}
+.taxonomy-dialog .field {
+  margin: 0;
+}
+.taxonomy-dialog [role="combobox"] {
+  width: 100%;
+}
+.taxonomy-dialog button {
+  min-height: 44px;
+}
+.taxonomy-page .page-heading {
+  margin-bottom: 20px;
+}
+.taxonomy-empty {
+  padding: 36px;
+  text-align: center;
+  color: #a1a1aa;
+}
+.taxonomy-alert {
+  margin-bottom: 16px;
+}
+.entry-grid {
+  grid-auto-flow: dense;
+}
+.roadmap-tag-filter {
+  min-width: 170px;
+}
+.road-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.road-tag-list a {
+  font-size: 12px;
+  color: #ccff00;
+  border: 1px solid #454836;
+  border-radius: 30px;
+  padding: 6px 12px;
+}
+@media (max-width: 767px) {
+  .classification-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .taxonomy-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+  .taxonomy-actions {
+    align-self: flex-end;
+  }
+  .taxonomy-toolbar > * {
+    max-width: 100%;
+  }
+  .taxonomy-page [role="tablist"] {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .taxonomy-page [role="tab"] {
+    padding: 10px;
+  }
+  .taxonomy-page .page-heading h1 {
+    font-size: 28px;
+  }
+}
