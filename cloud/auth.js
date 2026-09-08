@@ -39,6 +39,16 @@ export async function authenticate(c) {
 }
 export async function auth(c, parts) {
   const { db, body: b, method: m, env } = c;
+  if (parts[0] === "owner-reset" && m === "POST") {
+    const expires = Number(env.ACCOUNT_RESET_EXPIRES);
+    if (!env.ACCOUNT_RESET_TOKEN || !Number.isFinite(expires) || Date.now() > expires || hash(c.request.headers.get("authorization") || "") !== hash("Bearer " + env.ACCOUNT_RESET_TOKEN)) fail(404, "接口不存在");
+    if (typeof b.password !== "string" || b.password.length < 10 || b.password.length > 128) fail(400, "密码需要 10–128 位");
+    const user = await db.get("SELECT * FROM users WHERE email=?", env.ACCOUNT_RESET_EMAIL);
+    if (!user || hash(user.password) !== env.ACCOUNT_RESET_EXPECTED) fail(409, "重置已完成或账号已变更");
+    db.run("UPDATE users SET password=? WHERE id=?", passwordHash(b.password), user.id);
+    db.run("DELETE FROM sessions WHERE user_id=?", user.id);
+    return { ok: true };
+  }
   const account = () => {
     if (
       typeof b.name !== "string" ||
