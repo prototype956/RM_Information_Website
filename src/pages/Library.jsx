@@ -151,7 +151,7 @@ export default function Library({ home = false, mode }) {
         ))}
       </Choice>
       <Choice
-        aria-label="筛选课程或技术方向"
+        aria-label="筛选分类"
         value={category}
         onChange={(e) => update("category", e.target.value)}
       >

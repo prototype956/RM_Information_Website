@@ -8,7 +8,7 @@ export default function ClassificationFields({
   value,
   onChange,
   domainLabel = "所属资料库",
-  categoryLabel = "课程 / 技术方向",
+  categoryLabel = "分类",
 }) {
   const { taxonomy, taxonomyError, refreshTaxonomy, user } = useApp();
   const [request, setRequest] = useState(false),
@@ -54,7 +54,7 @@ export default function ClassificationFields({
             })
           }
         >
-          <option value="">选择课程 / 技术方向</option>
+          <option value="">选择分类</option>
           {!category && value.categoryId && (
             <option value={value.categoryId}>分类已失效或移动，请重选</option>
           )}
@@ -88,8 +88,8 @@ export default function ClassificationFields({
             {!taxonomy.revision
               ? "正在读取选项…"
               : !options.length
-                ? "当前资料库尚无课程／方向，请先添加或选择其他资料库。"
-                : "请选择有效的资料库与课程／方向。"}
+                ? "当前资料库尚无分类，请先添加或选择其他资料库。"
+                : "请选择有效的资料库与分类。"}
           </span>
           <Button type="button" variant="ghost" onClick={refreshTaxonomy}>
             刷新选项

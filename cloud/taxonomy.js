@@ -1,3 +1,9 @@
+import {
+  managementData,
+  contentPage,
+  mergePreview,
+  reorderIds,
+} from "../shared/taxonomy-management.js";
 import { fail, parse, fold } from "./db.js";
 
 export async function taxonomy(db) {
@@ -187,6 +193,14 @@ export async function taxonomy(db) {
           : 0,
     };
   };
+  const management = async () =>
+    managementData(
+      options,
+      await db.all(
+        "SELECT id,title,hidden,domain,category_id,tag_ids FROM resources",
+      ),
+      await db.all("SELECT id,draft,published FROM roadmaps"),
+    );
   // Classification edits apply the same transformation to both route snapshots.
   const rewrite = async (transform, conflict = true) => {
     for (const row of await db.all("SELECT * FROM resources")) {
@@ -255,11 +269,38 @@ export async function taxonomy(db) {
         return { tag, revision };
       }
       c.admin();
+      if (segments[0] === "usage" && m === "GET")
+        return { usage: (await management()).usage, revision };
+      if (segments[0] === "reorder" && m === "POST") {
+        if (b.revision !== revision)
+          fail(409, "选项已更新，请刷新管理页面后重试");
+        reorderIds(options, b, fail).forEach((id, i) => {
+          get(id).position = i;
+          db.run("UPDATE taxonomy_options SET position=? WHERE id=?", i, id);
+        });
+        bump();
+        return { revision };
+      }
       if (segments[0] !== "options") fail(404, "接口不存在");
       const old = get(segments[1]);
+      if (m === "GET" && segments[2] === "content") {
+        if (!old) fail(404, "选项不存在");
+        return contentPage(await management(), old.id, c.query, fail);
+      }
       if (m === "GET" && segments[2] === "impact") {
         if (!old) fail(404, "选项不存在");
-        return { impact: await impact(old), revision };
+        return {
+          impact: await impact(old),
+          revision,
+          ...mergePreview(
+            old,
+            c.query.targetId,
+            get,
+            options.filter((o) => o.kind === "category"),
+            lookup,
+            fail,
+          ),
+        };
       }
       if (b.revision !== revision)
         fail(409, "选项已更新，请刷新管理页面后重试");
@@ -297,7 +338,17 @@ export async function taxonomy(db) {
           name,
           normalized: fold(name),
           parent_id: parent,
-          position: b.position ?? old.position,
+          position:
+            parent !== before.parent_id
+              ? Math.max(
+                  -1,
+                  ...options
+                    .filter(
+                      (c) => c.kind === "category" && c.parent_id === parent,
+                    )
+                    .map((c) => c.position),
+                ) + 1
+              : (b.position ?? old.position),
         });
         db.run(
           "UPDATE taxonomy_options SET name=?,normalized=?,parent_id=?,position=? WHERE id=?",

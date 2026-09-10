@@ -19,7 +19,8 @@
     "test:requests": "node tests/requests-browser.mjs",
     "build:cloud": "node scripts/build-cloud.mjs",
     "test:cloud": "npm run build:cloud && node --test tests/cloud.test.mjs",
-    "test:registration": "npm run build && node tests/registration-browser.mjs"
+    "test:registration": "npm run build && node tests/registration-browser.mjs",
+    "test:members": "npm run build && node tests/members-browser.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1",

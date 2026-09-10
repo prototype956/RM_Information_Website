@@ -174,7 +174,7 @@ try {
     row(mp, "审核后可用标签").getByText("审核说明：命名明确，批准使用"),
   );
   await mp.goto(base + "/resources/new");
-  await choose(mp, "课程 / 技术方向", "新队员控制课程");
+  await choose(mp, "分类", "新队员控制课程");
   await mp
     .getByRole("combobox", { name: "标签", exact: true })
     .fill("审核后可用标签");

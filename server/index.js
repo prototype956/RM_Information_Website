@@ -233,6 +233,33 @@ app.post("/api/auth/logout", (req, res) => {
 });
 const adminOnly = (req, res, next) =>
   req.user.role === "admin" ? next() : fail(res, 403, "此操作需要管理员权限");
+app.get("/api/members", adminOnly, (req, res) => {
+  res.json({
+    members: db
+      .prepare(
+        "SELECT id,name,email,role FROM users ORDER BY name COLLATE NOCASE,email COLLATE NOCASE,id",
+      )
+      .all(),
+  });
+});
+app.delete("/api/invitations/:id/record", adminOnly, (req, res) => {
+  const deleted = db
+    .prepare(
+      "DELETE FROM invitations WHERE id=? AND (used=1 OR expires<=?) RETURNING id",
+    )
+    .get(req.params.id, Date.now());
+  if (!deleted) {
+    const exists = db
+      .prepare("SELECT id FROM invitations WHERE id=?")
+      .get(req.params.id);
+    return fail(
+      res,
+      exists ? 409 : 404,
+      exists ? "邀请仍有效，请先撤销再删除记录" : "邀请记录不存在或已被删除",
+    );
+  }
+  res.json({ ok: true });
+});
 app.get("/api/invitations", adminOnly, (req, res) =>
   res.json({
     invitations: db

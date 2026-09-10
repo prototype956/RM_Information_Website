@@ -216,6 +216,21 @@ export async function invitations(c, parts) {
     c.status = 201;
     return { id, token, expires };
   }
+  if (m === "DELETE" && parts.length === 2 && parts[1] === "record") {
+    const invite = await db.get(
+      "SELECT id,used,expires FROM invitations WHERE id=?",
+      parts[0],
+    );
+    if (!invite) fail(404, "邀请记录不存在或已被删除");
+    if (!invite.used && invite.expires > Date.now())
+      fail(409, "邀请仍有效，请先撤销再删除记录");
+    db.run(
+      "DELETE FROM invitations WHERE id=? AND (used=1 OR expires<=?)",
+      parts[0],
+      Date.now(),
+    );
+    return { ok: true };
+  }
   if (m === "DELETE" && parts.length === 1) {
     db.run("UPDATE invitations SET expires=0 WHERE id=?", parts[0]);
     return { ok: true };

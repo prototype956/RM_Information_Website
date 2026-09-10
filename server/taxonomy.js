@@ -1,3 +1,9 @@
+import {
+  managementData,
+  contentPage,
+  mergePreview,
+  reorderIds,
+} from "../shared/taxonomy-management.js";
 import { randomUUID } from "node:crypto";
 import { installTaxonomyRequests } from "./taxonomy-requests.js";
 const fold = (v) => v.trim().normalize("NFKC").toLowerCase();
@@ -358,6 +364,16 @@ export function createTaxonomy(db) {
     alias(old, target.id);
     db.prepare("DELETE FROM taxonomy_options WHERE id=?").run(old.id);
   }
+  const management = () =>
+    managementData(
+      [...all("domain"), ...all("category"), ...all("tag")],
+      db
+        .prepare(
+          "SELECT id,title,hidden,domain,category_id,tag_ids FROM resources",
+        )
+        .all(),
+      db.prepare("SELECT id,draft,published FROM roadmaps").all(),
+    );
   function register(app) {
     installTaxonomyRequests(app, db, {
       get,
@@ -401,6 +417,42 @@ export function createTaxonomy(db) {
         }),
       ),
     );
+    app.get(
+      "/api/taxonomy/usage",
+      wrap(
+        (req, res) =>
+          res.json({ usage: management().usage, revision: revision() }),
+        true,
+      ),
+    );
+    app.get(
+      "/api/taxonomy/options/:id/content",
+      wrap(
+        (req, res) =>
+          res.json(contentPage(management(), option(req).id, req.query, fail)),
+        true,
+      ),
+    );
+    app.post(
+      "/api/taxonomy/reorder",
+      wrap((req, res) => {
+        transaction(() => {
+          expected(req);
+          const ids = reorderIds(
+            [...all("domain"), ...all("category")],
+            req.body,
+            fail,
+          );
+          ids.forEach((id, i) =>
+            db
+              .prepare("UPDATE taxonomy_options SET position=? WHERE id=?")
+              .run(i, id),
+          );
+          bump();
+        });
+        res.json({ revision: revision() });
+      }, true),
+    );
     app.post(
       "/api/taxonomy/tags",
       wrap((req, res) => {
@@ -438,7 +490,18 @@ export function createTaxonomy(db) {
       "/api/taxonomy/options/:id/impact",
       wrap(
         (req, res) =>
-          res.json({ impact: impact(option(req)), revision: revision() }),
+          res.json({
+            impact: impact(option(req)),
+            revision: revision(),
+            ...mergePreview(
+              option(req),
+              req.query.targetId,
+              get,
+              all("category"),
+              lookup,
+              fail,
+            ),
+          }),
         true,
       ),
     );
@@ -470,7 +533,14 @@ export function createTaxonomy(db) {
             name,
             fold(name),
             parent,
-            req.body.position ?? old.position,
+            parent !== old.parent_id
+              ? Math.max(
+                  -1,
+                  ...all("category")
+                    .filter((c) => c.parent_id === parent)
+                    .map((c) => c.position),
+                ) + 1
+              : (req.body.position ?? old.position),
             old.id,
           );
           rewrite(

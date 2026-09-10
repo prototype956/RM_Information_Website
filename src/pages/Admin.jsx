@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ChevronRight,
   Plus,
@@ -25,6 +25,17 @@ import { Badge } from "@/components/ui/badge";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
+import MemberList from "./MemberList";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+
 export default function Admin() {
   const { user, resources, refresh, notify } = useApp();
   const [invitations, setInvitations] = useState([]),
@@ -32,6 +43,32 @@ export default function Admin() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [tab, setTab] = useState("invitations");
+  const [deleting, setDeleting] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [recordBusy, setRecordBusy] = useState(false);
+  const deleteTrigger = useRef(null);
+  const inviteHeading = useRef(null);
+  const removeRecord = async () => {
+    if (!deleting || recordBusy) return;
+    setRecordBusy(true);
+    setDeleteError("");
+    try {
+      await api(`/invitations/${deleting.id}/record`, { method: "DELETE" });
+      setInvitations((rows) => rows.filter((row) => row.id !== deleting.id));
+      setDeleting(null);
+      await load();
+      notify("邀请记录已删除");
+    } catch (e) {
+      if (e.status === 404) {
+        setInvitations((rows) => rows.filter((row) => row.id !== deleting.id));
+        setDeleting(null);
+        await load();
+        notify(e.message);
+      } else setDeleteError(e.message);
+    } finally {
+      setRecordBusy(false);
+    }
+  };
   const load = () =>
     api("/invitations")
       .then((r) => setInvitations(r.invitations))
@@ -84,6 +121,7 @@ export default function Admin() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="admin-tabs">
           <TabsTrigger value="invitations">成员邀请</TabsTrigger>
+          <TabsTrigger value="members">成员列表</TabsTrigger>
           <TabsTrigger value="resources">资料管理</TabsTrigger>
         </TabsList>
         <ErrorBox>{error}</ErrorBox>
@@ -143,12 +181,14 @@ export default function Admin() {
             </div>
           )}
           <div className="invite-list">
-            <h3>邀请记录</h3>
+            <h3 ref={inviteHeading} tabIndex={-1}>
+              邀请记录
+            </h3>
             {!invitations.length ? (
               <p>还没有创建邀请。</p>
             ) : (
-              invitations.map((i, n) => (
-                <div key={i.id}>
+              invitations.map((i) => (
+                <div key={i.id} data-invitation-id={i.id}>
                   <Users size={18} />
                   <span>
                     成员邀请
@@ -163,33 +203,54 @@ export default function Admin() {
                   >
                     {i.used
                       ? "已使用"
-                      : i.expires < Date.now()
+                      : i.expires <= Date.now()
                         ? "已失效"
                         : "待加入"}
                   </span>
-                  {!i.used && i.expires > Date.now() && (
+                  {!i.used && i.expires > Date.now() ? (
                     <Button
                       variant="ghost"
                       className="text-button"
+                      disabled={recordBusy}
                       onClick={async () => {
+                        setRecordBusy(true);
+                        setError("");
                         try {
                           await api(`/invitations/${i.id}`, {
                             method: "DELETE",
                           });
-                          load();
+                          await load();
                           notify("邀请已撤销");
                         } catch (e) {
                           setError(e.message);
+                        } finally {
+                          setRecordBusy(false);
                         }
                       }}
                     >
                       撤销
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="text-button"
+                      disabled={recordBusy}
+                      onClick={(e) => {
+                        deleteTrigger.current = e.currentTarget;
+                        setDeleteError("");
+                        setDeleting(i);
+                      }}
+                    >
+                      删除记录
                     </Button>
                   )}
                 </div>
               ))
             )}
           </div>
+        </TabsContent>
+        <TabsContent value="members" className="admin-panel">
+          <MemberList />
         </TabsContent>
         <TabsContent value="resources" className="admin-panel">
           <h2>资料管理</h2>
@@ -237,6 +298,41 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !recordBusy) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (deleteTrigger.current?.isConnected)
+              deleteTrigger.current.focus();
+            else inviteHeading.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除这条邀请记录？</AlertDialogTitle>
+            <AlertDialogDescription>
+              这条邀请记录将被永久删除，不影响已注册成员及其资料。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ErrorBox>{deleteError}</ErrorBox>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={recordBusy}>
+              保留记录
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={recordBusy}
+              onClick={removeRecord}
+            >
+              {recordBusy ? "正在删除…" : "确认删除"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

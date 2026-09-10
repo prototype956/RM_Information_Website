@@ -1,366 +1,355 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import assert from "node:assert/strict";
-import { chromium } from "playwright-core";
 import AxeBuilder from "@axe-core/playwright";
-let server,
-  base = process.env.TEST_URL;
-mkdirSync("artifacts/taxonomy", { recursive: true });
-if (!base) {
-  mkdirSync("artifacts/qa-data", { recursive: true });
-  const data = mkdtempSync(resolve("artifacts/qa-data/taxonomy-"));
-  server = spawn(process.execPath, ["server/index.js", "--production"], {
-    env: { ...process.env, DATA_DIR: data, PORT: "0" },
-    stdio: ["ignore", "pipe", "inherit"],
-  });
-  base = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Error("startup timeout")), 15000);
-    server.stdout.on("data", (c) => {
-      const m = c.toString().match(/http:\/\/127\.0\.0\.1:\d+/);
-      if (m) {
+import { blankRoadmap } from "../shared/roadmap.js";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtempSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { chromium } from "playwright-core";
+
+// Browser plugin not available: use the project's existing Playwright/Chrome stack.
+// Isolated database and screenshots live outside the source checkout.
+const data = mkdtempSync(path.join(tmpdir(), "rm-taxonomy-ui-"));
+const output = process.env.QA_OUTPUT || data;
+mkdirSync(output, { recursive: true });
+const server = spawn(process.execPath, ["server/index.js", "--production"], {
+  env: {
+    ...process.env,
+    NODE_ENV: "production",
+    HOST: "127.0.0.1",
+    PORT: "0",
+    DATA_DIR: data,
+  },
+  stdio: ["ignore", "pipe", "inherit"],
+});
+let browser;
+const errors = [];
+const password = "Registration-test-12345";
+const visible = (locator) =>
+  locator.waitFor({ state: "visible", timeout: 12000 });
+try {
+  const base = await new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(Error("QA server startup timed out")),
+      15000,
+    );
+    server.stdout.on("data", (chunk) => {
+      const match = chunk.toString().match(/http:[/][/]127[.]0[.]0[.]1:[0-9]+/);
+      if (match) {
         clearTimeout(timer);
-        resolve(m[0]);
+        resolve(match[0]);
       }
     });
-    server.once("error", reject);
-  });
-}
-assert.notEqual(new URL(base).port, "5173");
-const browser = await chromium.launch({ channel: "chrome", headless: true }),
-  context = await browser.newContext({
-    viewport: { width: 1440, height: 1050 },
-    reducedMotion: "reduce",
-  }),
-  page = await context.newPage(),
-  checks = [],
-  audits = [],
-  errors = [];
-page.on("pageerror", (e) => errors.push(e.message));
-const visible = (l) => l.waitFor({ state: "visible", timeout: 12000 });
-const check = (n) => {
-  checks.push(n);
-  console.log("PASS " + n);
-};
-const get = async (url) =>
-  (await context.request.get(base + "/api" + url)).json();
-async function choose(label, name, root = page) {
-  await root.getByRole("combobox", { name: label, exact: true }).click();
-  await page.getByRole("option", { name, exact: true }).click();
-}
-const dialog = () => page.getByRole("dialog");
-const row = (name) =>
-  page
-    .locator(".taxonomy-row")
-    .filter({
-      has: page
-        .locator("strong")
-        .filter({ hasText: new RegExp("^" + name + "$") }),
+    server.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
     });
-async function inspect(name, width) {
-  await page.evaluate(() => document.fonts.ready);
-  await visible(page.getByRole("heading", { level: 1 }));
-  const geometry = await page.evaluate(() => ({
-    width: innerWidth,
-    scroll: document.documentElement.scrollWidth,
-    small: [...document.querySelectorAll("main button")]
-      .filter((e) => {
-        const r = e.getBoundingClientRect();
-        return (
-          r.width &&
-          r.height &&
-          e.getAttribute("role") !== "checkbox" &&
-          (r.width < 43 || r.height < 43)
-        );
-      })
-      .map((e) => ({
-        text: e.textContent,
-        label: e.getAttribute("aria-label"),
-        width: e.getBoundingClientRect().width,
-        height: e.getBoundingClientRect().height,
-      })),
-  }));
-  assert.equal(geometry.scroll, width, JSON.stringify(geometry));
-  assert.deepEqual(geometry.small, [], JSON.stringify(geometry));
-  const axe = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-    .analyze();
-  assert.deepEqual(axe.violations, [], JSON.stringify(axe.violations));
-  await page.screenshot({
-    path: `artifacts/taxonomy/${name}-${width}.png`,
-    fullPage: true,
-  });
-  audits.push({ name, width, violations: axe.violations.length });
-}
-try {
-  const setup = (await get("/auth/status")).setupNeeded;
-  if (setup)
-    await context.request.post(base + "/api/auth/setup", {
-      data: {
-        name: "本地测试管理员",
-        email: "qa-admin@example.test",
-        password: "Local-test-password-123",
-        examples: false,
-      },
+    server.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(Error("QA server exited: " + code));
     });
-  else
-    await context.request.post(base + "/api/auth/login", {
-      data: {
-        email: "qa-admin@example.test",
-        password: "Local-test-password-123",
-      },
-    });
-  await page.goto(base + "/admin/taxonomy");
-  await visible(page.getByRole("heading", { name: "分类与标签管理" }));
-  const add = page.getByRole("button", { name: "新增资料库", exact: true });
-  await add.click();
-  await dialog().getByLabel("名称", { exact: true }).fill("UI 测试库");
-  await page.keyboard.press("Escape");
-  await dialog().waitFor({ state: "hidden" });
-  await page.waitForFunction(() =>
-    document.activeElement?.textContent.includes("新增资料库"),
-  );
-  await add.click();
-  await dialog().getByLabel("名称", { exact: true }).fill("UI 测试库");
-  await page.keyboard.press("Shift+Tab");
-  assert.equal(
-    await page.evaluate(
-      () => !!document.activeElement?.closest('[role="dialog"]'),
-    ),
-    true,
-  );
-  await dialog().getByRole("button", { name: "保存选项" }).click();
-  await visible(row("UI 测试库"));
-  check("admin creates library; dialog focus trap, Escape and restoration");
-  await page.getByRole("tab", { name: "课程／技术方向", exact: true }).click();
-  await page.getByRole("button", { name: "新增课程／技术方向" }).click();
-  await dialog().getByLabel("名称", { exact: true }).fill("UI 控制基础");
-  await choose("所属资料库", "UI 测试库", dialog());
-  await dialog().getByRole("button", { name: "保存选项" }).click();
-  await visible(row("UI 控制基础"));
-  let t = await get("/taxonomy");
-  const domain = t.domains.find((d) => d.name === "UI 测试库"),
-    category = t.categories.find((c) => c.name === "UI 控制基础");
-  await page.goto(base + "/resources/new");
-  await visible(page.getByLabel("资料标题", { exact: false }));
-  await choose("所属资料库", "UI 测试库");
-  await choose("课程 / 技术方向", "UI 控制基础");
-  await page.getByRole("tab", { name: "分享链接" }).click();
-  await page
-    .getByLabel("资料标题", { exact: false })
-    .fill("标签选择器验证资料");
-  await page
-    .getByLabel("资料链接", { exact: false })
-    .fill("https://example.org");
-  const tagInput = page.getByRole("combobox", { name: "标签", exact: true });
-  await tagInput.fill("复用标签，批量标签");
-  await tagInput.press("Enter");
-  await visible(page.getByRole("button", { name: "移除标签 复用标签" }));
-  await visible(page.getByRole("button", { name: "移除标签 批量标签" }));
-  await tagInput.fill("提交时创建");
-  await page.getByRole("button", { name: "发布资料", exact: true }).click();
-  await visible(
-    page.getByRole("heading", { name: "标签选择器验证资料", exact: true }),
-  );
-  const resourceId = page.url().split("/").pop();
-  assert.equal(
-    (await get("/resources/" + resourceId)).resource.tagIds.length,
-    3,
-  );
-  check(
-    "dynamic upload fields, batch tags and pending input committed on publish",
-  );
-  await page.goto(base + "/roadmaps");
-  await page.getByRole("button", { name: "创建路线", exact: true }).click();
-  await page.waitForURL("**/edit");
-  const roadmapId = page.url().split("/").at(-2);
-  await page.getByLabel("路线标题", { exact: true }).fill("可复用标签学习路线");
-  await choose("资料领域", "UI 测试库");
-  await page.waitForFunction(
-    () =>
-      document.querySelector(".road-save-status")?.textContent ===
-      "请选择路线分类",
-  );
-  await choose("路线分类", "UI 控制基础");
-  await page
-    .getByRole("combobox", { name: "标签", exact: true })
-    .fill("复用标签");
-  await page
-    .getByRole("combobox", { name: "标签", exact: true })
-    .press("Enter");
-  await visible(page.getByRole("button", { name: "移除标签 复用标签" }));
-  await page.getByRole("button", { name: "添加节点", exact: true }).click();
-  await page.getByLabel("节点标题").fill("基础实践");
-  await page
-    .getByRole("combobox", { name: "标签", exact: true })
-    .fill("路线发布标签");
-  await page.getByRole("button", { name: "发布路线", exact: true }).click();
-  await visible(page.getByRole("button", { name: "分享路线", exact: true }));
-  const published = await get("/roadmaps/" + roadmapId);
-  assert.deepEqual(published.document.tags, ["复用标签", "路线发布标签"]);
-  t = await get("/taxonomy");
-  assert.equal(t.tags.filter((x) => x.name === "复用标签").length, 1);
-  const tag = t.tags.find((x) => x.name === "复用标签");
-  check(
-    "roadmap reuses tags and publishes pending input; incomplete category does not lock autosave",
-  );
-  await page.goto(base + "/admin/taxonomy");
-  await page.getByRole("tab", { name: "课程／技术方向", exact: true }).click();
-  await row("UI 控制基础")
-    .getByRole("button", { name: "编辑", exact: true })
-    .click();
-  await dialog().getByLabel("名称", { exact: true }).fill("UI 控制进阶");
-  await dialog().getByRole("button", { name: "保存选项" }).click();
-  await visible(row("UI 控制进阶"));
-  await page.goto(
-    base +
-      `/resources?domain=${domain.id}&category=${encodeURIComponent("UI 控制基础")}`,
-  );
-  await visible(page.getByText("标签选择器验证资料", { exact: true }));
-  assert.equal(
-    (await get("/resources/" + resourceId)).resource.category,
-    "UI 控制进阶",
-  );
-  assert.equal(
-    (await get("/roadmaps/" + roadmapId)).document.category,
-    "UI 控制进阶",
-  );
-  check(
-    "rename updates resources and published roadmaps; old name URL remains valid",
-  );
-  await page.goto(base + "/admin/taxonomy");
-  await page.getByRole("tab", { name: "标签", exact: true }).click();
-  await row("复用标签")
-    .getByRole("button", { name: "合并／删除", exact: true })
-    .click();
-  await visible(dialog().getByText("引用：1 份资料、1 条路线、0 个下属分类。"));
-  await choose("合并到标签", "批量标签", dialog());
-  await dialog().getByRole("button", { name: "迁移并删除" }).click();
-  await dialog().waitFor({ state: "hidden" });
-  assert.equal(
-    (await get("/resources/" + resourceId)).resource.tags.filter(
-      (x) => x === "批量标签",
-    ).length,
-    1,
-  );
-  await page.goto(base + `/roadmaps?tag=${tag.id}`);
-  await visible(page.getByRole("heading", { name: "可复用标签学习路线" }));
-  check(
-    "tag merge shows reference counts, deduplicates and preserves old filter URLs",
-  );
-  await page.goto(base + "/admin/taxonomy");
-  await page.getByRole("tab", { name: "课程／技术方向", exact: true }).click();
-  await row("UI 控制进阶")
-    .getByRole("button", { name: "删除", exact: true })
-    .click();
-  assert.equal(
-    await dialog().getByRole("button", { name: "确认删除" }).isDisabled(),
-    true,
-  );
-  await choose("迁移目标", "RM 学习 / 通用工具", dialog());
-  await dialog().getByRole("button", { name: "迁移并删除" }).click();
-  await dialog().waitFor({ state: "hidden" });
-  assert.equal(
-    (await get("/resources/" + resourceId)).resource.category,
-    "通用工具",
-  );
-  assert.equal(
-    (await get("/roadmaps/" + roadmapId)).document.category,
-    "通用工具",
-  );
-  check(
-    "used category deletion requires migration target and updates both content types",
-  );
-  await page.getByRole("tab", { name: "资料库", exact: true }).click();
-  await row("UI 测试库")
-    .getByRole("button", { name: "编辑", exact: true })
-    .click();
-  await dialog().getByLabel("名称", { exact: true }).fill("UI 过期修改");
-  await context.request.post(base + "/api/taxonomy/tags", {
-    data: { name: "其他窗口新增" },
   });
-  await dialog().getByRole("button", { name: "保存选项" }).click();
-  await visible(dialog().getByText("选项已被其他人更新，请刷新管理页面后重试"));
-  assert.equal(
-    await dialog().getByLabel("名称", { exact: true }).inputValue(),
-    "UI 过期修改",
-  );
-  await dialog().getByRole("button", { name: "读取最新选项" }).click();
-  await dialog().getByRole("button", { name: "保存选项" }).click();
-  await visible(row("UI 过期修改"));
-  check("concurrent taxonomy edit retains form and offers explicit retry");
-  for (const width of [1440, 768, 360]) {
-    await page.setViewportSize({ width, height: 1050 });
-    await page.goto(base + "/admin/taxonomy");
-    await inspect("manager", width);
-    await page.goto(base + `/resources/${resourceId}/edit`);
-    await visible(page.getByRole("button", { name: "移除标签 批量标签" }));
-    await inspect("resource-tags", width);
-    await page.goto(base + `/roadmaps/${roadmapId}/edit`);
-    await visible(page.getByLabel("路线标题", { exact: true }));
-    await inspect("roadmap-tags", width);
-  }
-  check(
-    "manager and both tag forms: desktop, tablet, mobile and accessibility",
-  );
-  await page.setViewportSize({ width: 360, height: 1050 });
-  await page.goto(base + "/resources/" + resourceId + "/edit");
-  await page.route("**/api/taxonomy/tags", (r) => r.abort());
-  const input = page.getByRole("combobox", { name: "标签", exact: true });
-  await input.fill("失败重试标签");
-  await input.press("Enter");
-  await visible(page.locator('.tag-picker [role="alert"]'));
-  assert.equal(await input.inputValue(), "失败重试标签");
-  await page.unroute("**/api/taxonomy/tags");
-  await input.press("Enter");
-  await visible(page.getByRole("button", { name: "移除标签 失败重试标签" }));
-  await page.getByRole("button", { name: "保存修改", exact: true }).click();
-  await visible(
-    page.getByRole("heading", { name: "标签选择器验证资料", exact: true }),
-  );
-  check("tag creation failure retains input and retry works on mobile");
-  const invite = await (
-    await context.request.post(base + "/api/invitations", { data: {} })
-  ).json();
-  const mc = await browser.newContext();
-  await mc.request.post(base + "/api/auth/register", {
+  browser = await chromium.launch({ channel: "chrome", headless: true });
+  const admin = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    permissions: ["clipboard-read", "clipboard-write"],
+  });
+  const setup = await admin.request.post(base + "/api/auth/setup", {
     data: {
-      name: "测试成员",
-      email: `taxonomy-${Date.now()}@example.test`,
-      password: "Local-test-password-123",
-      token: invite.token,
+      name: "测试管理员",
+      email: "admin@example.test",
+      password,
+      examples: false,
     },
   });
-  const mp = await mc.newPage();
-  await mp.goto(base + "/admin/taxonomy");
-  await visible(mp.getByRole("heading", { name: "需要管理员权限" }));
-  await mp.goto(base + "/resources/new");
-  await mp
-    .getByRole("combobox", { name: "标签", exact: true })
-    .fill("成员新标签");
-  await mp.getByRole("combobox", { name: "标签", exact: true }).press("Enter");
-  await visible(mp.getByRole("dialog", {name:"申请新增选项"}));
-  await mp.getByRole("button", {name:"提交申请",exact:true}).click();
-  await visible(mp.getByText("申请已提交，尚未添加到当前内容。审核通过后可选择。"));
-  assert.equal(await mp.getByRole("button", {name:"移除标签 成员新标签"}).count(),0);
-  await mc.close();
-  check("members request new tags and cannot bypass category management");
+  assert.equal(setup.status(), 201);
+  await admin.addInitScript(() => localStorage.setItem("rm-motion", "off"));
+
+  const get = async (p) => (await admin.request.get(base + "/api" + p)).json();
+  const add = async (kind, name, parentId = "") => {
+    const r = await admin.request.post(base + "/api/taxonomy/options", {
+      data: {
+        kind,
+        name,
+        parentId,
+        revision: (await get("/taxonomy")).revision,
+      },
+    });
+    assert.equal(r.status(), 201);
+    return (await r.json()).option;
+  };
+  for (let i = 0; i < 23; i++)
+    await add("tag", "标签" + String(i).padStart(2, "0"));
+  for (const [label, viewport] of [
+    ["desktop", { width: 1440, height: 1000 }],
+    ["mobile", { width: 390, height: 844 }],
+  ]) {
+    const page = await admin.newPage();
+    await page.setViewportSize(viewport);
+    page.on("pageerror", (e) => errors.push(e.message));
+    const d1 = await add("domain", label + "资料库甲"),
+      d2 = await add("domain", label + "资料库乙");
+    const c = await add("category", label + "分类一", d1.id);
+    await add("category", label + "分类二", d1.id);
+    for(let i=0;i<21;i++) {
+      const r=await admin.request.post(base+'/api/resources',{multipart:{title:label+'资料'+i,domain:d1.id,categoryId:c.id,tagIds:'[]',kind:'link',url:'https://example.org',description:'验证内容分页'}});
+      assert.equal(r.status(),201);const resource=await r.json();
+      if(i===0)await admin.request.patch(base+'/api/resources/'+resource.id,{data:{hidden:true}});
+    }
+    const doc=blankRoadmap({domain:d1.id,categoryId:c.id,tagIds:[]});doc.title=label+'草稿路线';
+    assert.equal((await admin.request.post(base+'/api/roadmaps',{data:{document:doc}})).status(),201);
+    const row = (id) => page.locator('[data-option-id="' + id + '"]');
+    const dialog = () => page.getByRole("dialog");
+    const choose = async (name, value) => {
+      await dialog().getByRole("combobox", { name, exact: true }).click();
+      await page.getByRole("option", { name: value, exact: true }).click();
+    };
+    const shot = async (name) => {
+      const audit=await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
+      await page.evaluate(() => {
+        document.activeElement?.blur();
+        window.scrollTo(0, 0);
+      });
+      await page.screenshot({
+        path: path.join(output, label + "-" + name + ".png"),
+        fullPage: true,
+      });
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        true,
+      );
+    };
+    await page.goto(base + "/admin/taxonomy");
+    await visible(row(d1.id));
+    await row(d1.id)
+      .getByRole("button", { name: "上移 " + d1.name, exact: true })
+      .click();
+    await visible(page.getByText("顺序已更新", { exact: true }));
+    let domains = (await get("/taxonomy")).domains;
+    assert.equal(
+      domains.findIndex((d) => d.id === d1.id) + 2,
+      domains.findIndex((d) => d.id === d2.id),
+    );
+    await page.getByRole("button", { name: "新建资料库", exact: true }).click();
+    await dialog()
+      .getByLabel("名称", { exact: true })
+      .fill(label + "取消新建");
+    await dialog().getByRole("button", { name: "取消", exact: true }).click();
+    assert.ok(
+      !(await get("/taxonomy")).domains.some(
+        (d) => d.name === label + "取消新建",
+      ),
+    );
+    await page
+      .getByRole("textbox", { name: "搜索目录" })
+      .fill(label + "分类一");
+    await visible(
+      row(c.id).or(
+        page.getByRole("button", {
+          name: d1.name + " / " + c.name,
+          exact: true,
+        }),
+      ),
+    );
+    assert.equal(
+      await page
+        .getByRole("button", { name: "上移 " + c.name, exact: true })
+        .isDisabled(),
+      true,
+    );
+    await page
+      .getByRole("button", { name: d1.name + " / " + c.name, exact: true })
+      .click();
+    await visible(page.getByRole("heading", { name: c.name, exact: true }));
+    await visible(page.locator('.tm-content .taxonomy-row').first());assert.equal(await page.locator('.tm-content .taxonomy-row').count(),20);
+    await page.locator('.tm-content').getByRole('button',{name:'下一页',exact:true}).click();await visible(page.locator('.tm-content').getByText('2 / 2 · 共 21 条',{exact:true}));await page.waitForFunction(()=>document.querySelectorAll('.tm-content .taxonomy-row').length===1);
+    await page.locator('.tm-content').getByRole('button',{name:'学习路线',exact:true}).click();await visible(page.locator('.tm-content').getByText('草稿',{exact:true}));await shot('content');
+    await page
+      .locator(".tm-breadcrumb")
+      .getByRole("button", { name: d1.name, exact: true })
+      .click();
+    await page.getByRole("button", { name: "新增分类", exact: true }).click();
+    await dialog()
+      .getByLabel("名称", { exact: true })
+      .fill(label + "新增分类");
+    await dialog().getByRole("button", { name: "保存", exact: true }).click();
+    await dialog().waitFor({ state: "hidden" });
+    await visible(
+      page.getByRole("heading", { name: label + "新增分类", exact: true }),
+    );
+    const added = (await get("/taxonomy")).categories.find(
+      (o) => o.name === label + "新增分类",
+    );
+    await page
+      .locator(".tm-selected")
+      .getByRole("button", { name: "移动分类", exact: true })
+      .click();
+    await choose("目标资料库", d2.name);
+    await dialog()
+      .getByRole("button", { name: "确认移动", exact: true })
+      .click();
+    await dialog().waitFor({ state: "hidden" });
+    assert.equal(
+      (await get("/taxonomy")).categories.find((o) => o.id === added.id)
+        .parent_id,
+      d2.id,
+    );
+    await page
+      .locator(".tm-selected")
+      .getByRole("button", { name: "重命名", exact: true })
+      .click();
+    await dialog()
+      .getByLabel("名称", { exact: true })
+      .fill(label + "重命名");
+    await add("tag", label + "并发标签");
+    await dialog().getByRole("button", { name: "保存", exact: true }).click();
+    await visible(
+      dialog()
+        .getByText(/更新|刷新/)
+        .first(),
+    );
+    await dialog()
+      .getByRole("button", { name: "刷新选项与影响范围", exact: true })
+      .click();
+    assert.equal(
+      await dialog().getByLabel("名称", { exact: true }).inputValue(),
+      label + "重命名",
+    );
+    await dialog().getByRole("button", { name: "保存", exact: true }).click();
+    await dialog().waitFor({ state: "hidden" });
+    await page
+      .locator(".tm-breadcrumb")
+      .getByRole("button", { name: d2.name, exact: true })
+      .click();
+    await page
+      .locator(".tm-selected")
+      .getByRole("button", { name: "删除", exact: true })
+      .click();
+    await visible(dialog().getByRole("button", { name: "改为合并" }));
+    assert.equal(
+      await dialog()
+        .getByRole("button", { name: "确认删除", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await shot("nonempty-delete");
+    await dialog().getByRole("button", { name: "取消", exact: true }).click();
+    await page
+      .locator(".tm-breadcrumb")
+      .getByRole("button", { name: "全部资料库", exact: true })
+      .click();
+    await shot("directory");
+    await row(d2.id).getByRole("button", { name: "合并", exact: true }).click();
+    await choose("合并到", d1.name);
+    await visible(dialog().getByText(/移动为/));
+    await shot("merge");
+    await dialog()
+      .getByRole("button", { name: "确认合并", exact: true })
+      .click();
+    await dialog().waitFor({ state: "hidden" });
+    assert.ok(!(await get("/taxonomy")).domains.some((o) => o.id === d2.id));
+    await page.getByRole("tab", { name: "标签管理", exact: true }).click();
+    await visible(page.getByRole("button", { name: "下一页", exact: true }));
+    assert.equal(await page.locator(".tm-option").count(), 20);
+    await page.getByRole("button", { name: "下一页", exact: true }).click();
+    assert.ok((await page.locator(".tm-option").count()) > 0);
+    await page.getByRole("textbox", { name: "搜索标签" }).fill("标签00");
+    assert.equal(await page.locator(".tm-option").count(), 1);
+    const tag = (await get("/taxonomy")).tags.find((o) => o.name === "标签00");
+    await row(tag.id)
+      .getByRole("button", { name: "0 份资料", exact: true })
+      .click();
+    await visible(
+      page.getByRole("heading", { name: "标签00 · 关联内容", exact: true }),
+    );
+    await page.route("**/api/taxonomy/options/" + tag.id, (route) =>
+      route.request().method() === "DELETE"
+        ? route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "测试删除失败，请重试" }),
+          })
+        : route.continue(),
+    );
+    await row(tag.id)
+      .getByRole("button", { name: "删除", exact: true })
+      .click();
+    await dialog()
+      .getByRole("button", { name: "确认删除", exact: true })
+      .click();
+    await visible(dialog().getByText("测试删除失败，请重试", { exact: true }));
+    await shot("delete-error");
+    await page.unroute("**/api/taxonomy/options/" + tag.id);
+    let release;
+    const held = new Promise((r) => {
+      release = r;
+    });
+    let count = 0;
+    await page.route("**/api/taxonomy/options/" + tag.id, async (route) => {
+      if (route.request().method() === "DELETE") {
+        count++;
+        await held;
+      }
+      await route.continue();
+    });
+    await dialog()
+      .getByRole("button", { name: "确认删除", exact: true })
+      .click();
+    assert.equal(
+      await dialog()
+        .getByRole("button", { name: "正在处理…", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(
+      await dialog()
+        .getByRole("button", { name: "取消", exact: true })
+        .isDisabled(),
+      true,
+    );
+    release();
+    await dialog().waitFor({ state: "hidden" });
+    assert.equal(count, 1);
+    await page.unroute("**/api/taxonomy/options/" + tag.id);
+    await add("tag", "标签00");
+    await page.getByRole("button", { name: "刷新", exact: true }).click();
+    await page.getByRole("textbox", { name: "搜索标签" }).fill("");
+    await shot("tags");
+    await page
+      .getByRole("combobox", { name: "标签使用情况", exact: true })
+      .click();
+    await page.getByRole("option", { name: "未使用", exact: true }).click();
+    await page.getByRole("combobox", { name: "标签排序", exact: true }).click();
+    await page
+      .getByRole("option", { name: "按使用量排序", exact: true })
+      .click();
+    await page.route("**/api/taxonomy/usage", (r) =>
+      r.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "测试统计读取失败" }),
+      }),
+    );
+    await page.getByRole("button", { name: "刷新", exact: true }).click();
+    await visible(page.getByText("测试统计读取失败", { exact: true }));
+    await page.unroute("**/api/taxonomy/usage");
+    await page.getByRole("button", { name: "刷新", exact: true }).click();
+    await page
+      .getByText("测试统计读取失败", { exact: true })
+      .waitFor({ state: "hidden" });
+    assert.equal(await page.locator("vite-error-overlay").count(), 0);
+    await page.close();
+    console.log(
+      "PASS " +
+        label +
+        " directory, operations, tags, conflict, recovery, responsive",
+    );
+  }
   assert.deepEqual(errors, []);
-  writeFileSync(
-    "artifacts/taxonomy/results.json",
-    JSON.stringify({ checks, audits, errors }, null, 2),
-  );
-  console.log(
-    `${checks.length} taxonomy browser groups; ${audits.length} responsive audits`,
-  );
-} catch (e) {
-  await page.screenshot({
-    path: "artifacts/taxonomy/failure.png",
-    fullPage: true,
-  });
-  console.error(e);
-  process.exitCode = 1;
+  console.log("Screenshots: " + output);
 } finally {
-  await browser.close();
-  server?.kill();
+  await browser?.close();
+  server.kill();
 }

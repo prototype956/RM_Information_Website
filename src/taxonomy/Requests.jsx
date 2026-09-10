@@ -106,7 +106,7 @@ export default function Requests({ review = false }) {
           <p>
             {review
               ? "审核成员提出的分类与标签，保持队伍知识目录清晰。"
-              : "申请新的资料库、课程／技术方向或标签，查看管理员的审核结果。"}
+              : "申请新的资料库、分类或标签，查看管理员的审核结果。"}
           </p>
         </div>
         {!review && (

@@ -1,3 +1,4 @@
+import { taxonomyManagementContract } from "./taxonomy-management-contract.js";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -490,3 +491,5 @@ test("legacy migration is idempotent and preserves files, content, node IDs and 
   );
   db.close();
 });
+
+test("taxonomy management usage, preview, pagination, ordering and permissions", async () => { await taxonomyManagementContract(request, admin, member); });

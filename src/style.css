@@ -2688,3 +2688,23 @@ html[data-motion="off"] *::after {
   transition: none !important;
   scroll-behavior: auto !important;
 }
+
+/* Member directory keeps names and long email addresses readable on phones. */
+.member-directory > h2 { font-size: 22px; }
+.member-count { color: var(--muted-foreground); margin: 12px 0 24px; }
+.member-filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr); gap: 16px; }
+.member-table { width: 100%; table-layout: fixed; }
+.member-table th:nth-child(1) { width: 28%; }
+.member-table th:nth-child(2) { width: 48%; }
+.member-table th:nth-child(3) { width: 24%; }
+.member-table td { white-space: normal; overflow-wrap: anywhere; }
+.member-table td:first-child > [data-slot="badge"] { margin: 4px 0 0 8px; }
+.member-pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px; }
+@media (max-width: 600px) {
+  .member-filters { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .member-table th, .member-table td { padding: 10px 4px; font-size: 12px; }
+  .member-table td:first-child > [data-slot="badge"] { margin-left: 0; }
+  .member-table [data-slot="badge"] { white-space: nowrap; font-size: 11px; padding: 3px 6px; }
+  .member-pagination { gap: 8px; font-size: 12px; }
+  .admin-tabs { max-width: 100%; }
+}

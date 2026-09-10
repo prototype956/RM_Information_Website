@@ -14,7 +14,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Field, Choice, ErrorBox } from "../components/shared";
 export const requestKinds = {
   domain: "资料库",
-  category: "课程／技术方向",
+  category: "分类",
   tag: "标签",
 };
 export default function RequestDialog({ initial = {}, onClose, onSuccess }) {

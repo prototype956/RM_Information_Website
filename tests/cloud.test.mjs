@@ -1,3 +1,4 @@
+import { taxonomyManagementContract } from "./taxonomy-management-contract.js";
 import { invitationContract } from "./invitation-contract.js";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -566,3 +567,5 @@ test("cloud deletion cascades progress and attachment metadata", async () => {
 test("cloud short and legacy invitation registration contract", async () => {
   await invitationContract(api, admin, (sql, ...args) => db.prepare(sql).bind(...args).run());
 });
+
+test("taxonomy management usage, preview, pagination, ordering and permissions", async () => { await taxonomyManagementContract(api, admin, member); });

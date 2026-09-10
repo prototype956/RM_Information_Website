@@ -114,7 +114,11 @@ export default {
         !url.pathname.startsWith("/_migration/")
       ) {
         // Only the frontend build is an asset source; database and uploads never are.
-        const asset = await env.ASSETS.fetch(request); if (asset.status !== 404 || url.pathname.includes(".")) return asset; return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
+        const asset = await env.ASSETS.fetch(request);
+        if (asset.status !== 404 || url.pathname.includes(".")) return asset;
+        return env.ASSETS.fetch(
+          new Request(new URL("/index.html", request.url), request),
+        );
       }
       if (
         !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
@@ -168,7 +172,18 @@ export default {
         };
         if (parts[0] === "me" && method === "GET")
           result = { user: publicUser(c.user) };
-        else if (parts[0] === "invitations")
+        else if (
+          parts[0] === "members" &&
+          parts.length === 1 &&
+          method === "GET"
+        ) {
+          c.admin();
+          result = {
+            members: await db.all(
+              "SELECT id,name,email,role FROM users ORDER BY name COLLATE NOCASE,email COLLATE NOCASE,id",
+            ),
+          };
+        } else if (parts[0] === "invitations")
           result = await invitations(c, parts.slice(1));
         else if (parts[0] === "files" && method === "GET")
           return await file(c, parts[1]);

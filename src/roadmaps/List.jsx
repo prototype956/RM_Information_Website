@@ -82,7 +82,7 @@ export default function RoadmapList() {
     try {
       const selection = defaultSelection(taxonomy);
       if (!selection.categoryId)
-        throw new Error("请先由管理员创建资料库和课程／方向");
+        throw new Error("请先由管理员创建资料库和分类");
       const r = await send("/roadmaps", { document: blankRoadmap(selection) });
       go(`/roadmaps/${r.id}/edit`);
     } catch (e) {
