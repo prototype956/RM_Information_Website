@@ -1,3 +1,4 @@
+import { invitationContract } from "./invitation-contract.js";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -560,4 +561,8 @@ test("cloud deletion cascades progress and attachment metadata", async () => {
     ).n,
     0,
   );
+});
+
+test("cloud short and legacy invitation registration contract", async () => {
+  await invitationContract(api, admin, (sql, ...args) => db.prepare(sql).bind(...args).run());
 });

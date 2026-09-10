@@ -5,6 +5,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { fail } from "./db.js";
+import {
+  createInvitationCode,
+  normalizeInvitationCode,
+} from "../shared/invitation.js";
 export const hash = (value) => createHash("sha256").update(value).digest("hex");
 export const publicUser = (u) => ({
   id: u.id,
@@ -41,11 +45,31 @@ export async function auth(c, parts) {
   const { db, body: b, method: m, env } = c;
   if (parts[0] === "owner-reset" && m === "POST") {
     const expires = Number(env.ACCOUNT_RESET_EXPIRES);
-    if (!env.ACCOUNT_RESET_TOKEN || !Number.isFinite(expires) || Date.now() > expires || hash(c.request.headers.get("authorization") || "") !== hash("Bearer " + env.ACCOUNT_RESET_TOKEN)) fail(404, "接口不存在");
-    if (typeof b.password !== "string" || b.password.length < 10 || b.password.length > 128) fail(400, "密码需要 10–128 位");
-    const user = await db.get("SELECT * FROM users WHERE email=?", env.ACCOUNT_RESET_EMAIL);
-    if (!user || hash(user.password) !== env.ACCOUNT_RESET_EXPECTED) fail(409, "重置已完成或账号已变更");
-    db.run("UPDATE users SET password=? WHERE id=?", passwordHash(b.password), user.id);
+    if (
+      !env.ACCOUNT_RESET_TOKEN ||
+      !Number.isFinite(expires) ||
+      Date.now() > expires ||
+      hash(c.request.headers.get("authorization") || "") !==
+        hash("Bearer " + env.ACCOUNT_RESET_TOKEN)
+    )
+      fail(404, "接口不存在");
+    if (
+      typeof b.password !== "string" ||
+      b.password.length < 10 ||
+      b.password.length > 128
+    )
+      fail(400, "密码需要 10–128 位");
+    const user = await db.get(
+      "SELECT * FROM users WHERE email=?",
+      env.ACCOUNT_RESET_EMAIL,
+    );
+    if (!user || hash(user.password) !== env.ACCOUNT_RESET_EXPECTED)
+      fail(409, "重置已完成或账号已变更");
+    db.run(
+      "UPDATE users SET password=? WHERE id=?",
+      passwordHash(b.password),
+      user.id,
+    );
     db.run("DELETE FROM sessions WHERE user_id=?", user.id);
     return { ok: true };
   }
@@ -82,7 +106,7 @@ export async function auth(c, parts) {
   if (parts[0] === "invitation" && m === "GET") {
     const invite = await db.get(
       "SELECT * FROM invitations WHERE token_hash=?",
-      hash(parts[1] || ""),
+      hash(normalizeInvitationCode(parts[1])),
     );
     if (!invite || invite.used || invite.expires < Date.now())
       fail(410, "邀请已失效或已被使用，请联系管理员重新邀请");
@@ -141,7 +165,7 @@ export async function auth(c, parts) {
       typeof b.token === "string" &&
       (await db.get(
         "SELECT * FROM invitations WHERE token_hash=?",
-        hash(b.token),
+        hash(normalizeInvitationCode(b.token)),
       ));
     if (!invite || invite.used || invite.expires < Date.now())
       fail(410, "邀请已失效或已被使用");
@@ -180,7 +204,7 @@ export async function invitations(c, parts) {
     };
   if (m === "POST" && !parts.length) {
     const id = crypto.randomUUID(),
-      token = randomBytes(24).toString("hex"),
+      token = createInvitationCode(),
       expires = Date.now() + 7 * 86400000;
     db.run(
       "INSERT INTO invitations(id,token_hash,created_by,expires) VALUES(?,?,?,?)",

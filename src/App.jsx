@@ -185,14 +185,22 @@ export default function App() {
         <Button onClick={boot}>重新连接</Button>
       </div>
     );
-  else if (!user || route.startsWith("/join/"))
+  else if (
+    !user ||
+    route.startsWith("/join/") ||
+    route.split("?")[0] === "/register"
+  )
     page = (
       <Auth
         setup={setup}
         onAuth={(u) => {
           setUser(u);
           setSetup(false);
-          if (route.startsWith("/join/") || route === "/login") go("/", true);
+          if (
+            route.startsWith("/join/") ||
+            ["/login", "/register"].includes(route.split("?")[0])
+          )
+            go("/", true);
         }}
       />
     );

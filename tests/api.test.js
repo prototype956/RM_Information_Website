@@ -1,3 +1,5 @@
+import { invitationContract } from "./invitation-contract.js";
+import { DatabaseSync } from "node:sqlite";
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -96,3 +98,10 @@ test('logout invalidates session',async()=>{
   assert.equal((await request('/me',{cookie:memberCookie})).status,401);
 });
 
+
+test('short and legacy invitation registration contract', async () => {
+  const fixtureDb = new DatabaseSync(path.join(testDir, 'resources.db'));
+  try {
+    await invitationContract(request, adminCookie, (sql, ...args) => fixtureDb.prepare(sql).run(...args));
+  } finally { fixtureDb.close(); }
+});

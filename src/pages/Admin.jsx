@@ -28,7 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 export default function Admin() {
   const { user, resources, refresh, notify } = useApp();
   const [invitations, setInvitations] = useState([]),
-    [inviteLink, setInviteLink] = useState(""),
+    [inviteCode, setInviteCode] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [tab, setTab] = useState("invitations");
@@ -55,7 +55,7 @@ export default function Admin() {
     setError("");
     try {
       const r = await send("/invitations", {});
-      setInviteLink(`${location.origin}/join/${r.token}`);
+      setInviteCode(r.token);
       load();
       notify("邀请已创建，7 天内有效，仅可使用一次");
     } catch (e) {
@@ -92,15 +92,35 @@ export default function Admin() {
           <p>每个邀请仅供一位成员注册使用，7 天后自动失效。</p>
           <Button disabled={busy} onClick={create}>
             <Plus size={16} />
-            {busy ? "正在创建…" : "创建邀请链接"}
+            {busy ? "正在创建…" : "创建邀请码"}
           </Button>
-          {inviteLink && (
+          {inviteCode && (
             <div className="invitation-result">
+              <Field>
+                新邀请码
+                <Input
+                  readOnly
+                  value={inviteCode}
+                  onFocus={(e) => e.target.select()}
+                />
+              </Field>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  navigator.clipboard
+                    .writeText(inviteCode)
+                    .then(() => notify("邀请码已复制"))
+                    .catch(() => notify("请手动选择并复制邀请码"))
+                }
+              >
+                <Copy size={16} />
+                复制邀请码
+              </Button>
               <Field>
                 新邀请链接
                 <Input
                   readOnly
-                  value={inviteLink}
+                  value={`${location.origin}/join/${inviteCode}`}
                   onFocus={(e) => e.target.select()}
                 />
               </Field>
@@ -109,7 +129,7 @@ export default function Admin() {
 
                 onClick={() =>
                   navigator.clipboard
-                    .writeText(inviteLink)
+                    .writeText(`${location.origin}/join/${inviteCode}`)
                     .then(() => notify("邀请链接已复制"))
                     .catch(() => notify("请手动选择并复制链接"))
                 }
@@ -117,7 +137,9 @@ export default function Admin() {
                 <Copy size={16} />
                 复制链接
               </Button>
-              <small>链接只在本次创建时完整显示，请复制后分享给队友。</small>
+              <small>
+                邀请码和链接只在本次创建时完整显示，请复制后分享给队友。
+              </small>
             </div>
           )}
           <div className="invite-list">

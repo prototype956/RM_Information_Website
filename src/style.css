@@ -1864,6 +1864,9 @@ body:has([data-scroll-locked]) {
   line-height: 1.8;
   cursor: pointer;
 }
+.auth-switch {
+  margin-top: 12px;
+}
 .auth-note {
   border-top: 1px solid var(--border);
   padding-top: 24px;

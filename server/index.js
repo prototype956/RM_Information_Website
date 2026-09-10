@@ -14,6 +14,10 @@ import { fileURLToPath } from "node:url";
 import { seedResources } from "./seed.js";
 import { installRoadmaps } from "./roadmaps.js";
 import { createTaxonomy } from "./taxonomy.js";
+import {
+  createInvitationCode,
+  normalizeInvitationCode,
+} from "../shared/invitation.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, "data"));
@@ -157,7 +161,7 @@ app.post("/api/auth/login", (req, res) => {
 app.get("/api/auth/invitation/:token", (req, res) => {
   const invite = db
     .prepare("SELECT * FROM invitations WHERE token_hash=?")
-    .get(hashToken(req.params.token));
+    .get(hashToken(normalizeInvitationCode(req.params.token)));
   if (!invite || invite.used || invite.expires < Date.now())
     return fail(res, 410, "邀请已失效或已被使用，请联系管理员重新邀请");
   res.json({ valid: true, expires: invite.expires });
@@ -167,7 +171,7 @@ app.post("/api/auth/register", (req, res) => {
     typeof req.body.token === "string" &&
     db
       .prepare("SELECT * FROM invitations WHERE token_hash=?")
-      .get(hashToken(req.body.token));
+      .get(hashToken(normalizeInvitationCode(req.body.token)));
   if (!invite || invite.used || invite.expires < Date.now())
     return fail(res, 410, "邀请已失效或已被使用");
   if (!validAccount(req.body))
@@ -239,7 +243,7 @@ app.get("/api/invitations", adminOnly, (req, res) =>
   }),
 );
 app.post("/api/invitations", adminOnly, (req, res) => {
-  const token = randomBytes(24).toString("hex");
+  const token = createInvitationCode();
   const id = randomUUID();
   const expires = Date.now() + 7 * 86400000;
   db.prepare(

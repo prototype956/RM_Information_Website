@@ -136,7 +136,7 @@ try {
   for(const id of temporary)await context.request.delete(`${base}/api/resources/${id}`);
   check('real pagination');
   await page.goto(base+'/admin');
-  await page.getByRole('button',{name:'创建邀请链接'}).click();
+  await page.getByRole('button',{name:'创建邀请码'}).click();
   const join=await page.getByLabel('新邀请链接').inputValue();
   const guest=await browser.newContext({viewport:{width:1440,height:950}});const guestPage=await guest.newPage();
   guestPage.on('pageerror',error=>errors.push(error.message));
