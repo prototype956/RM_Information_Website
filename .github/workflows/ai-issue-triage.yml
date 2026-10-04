@@ -30,7 +30,7 @@ jobs:
           AI_MODEL: ${{ vars.AI_MODEL }}
           AI_BASE_URL: ${{ vars.AI_BASE_URL }}
         run: node scripts/ai/issue-triage.mjs --mode analyze
-      - uses: actions/upload-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: issue-triage-${{ github.event.issue.number }}
           path: triage.json
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: issue-triage-${{ github.event.issue.number }}
       - name: Apply labels and state comment

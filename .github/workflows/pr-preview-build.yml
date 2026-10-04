@@ -24,7 +24,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run build:cloud
-      - uses: actions/upload-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: pr-preview-${{ github.event.pull_request.number }}
           path: dist

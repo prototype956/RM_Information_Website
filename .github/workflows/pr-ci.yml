@@ -37,7 +37,7 @@ jobs:
         run: |
           set -o pipefail
           git diff --check origin/main...HEAD | reviewdog -f=efm -name=git-diff-check -reporter=github-pr-check -fail-level=error -efm='%f:%l: %m'
-      - uses: actions/upload-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: pr-ci-dist-${{ github.event.pull_request.number }}
