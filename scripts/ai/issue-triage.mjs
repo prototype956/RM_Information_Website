@@ -62,7 +62,8 @@ async function upsertComment(number, body) {
 }
 async function ensureLabels(labels) {
   const colours = { ui: "1d76db", roadmap: "5319e7", backend: "b60205", data: "0e8a16", release: "fbca04", low: "c2e0c6", medium: "f9d0c4", high: "d93f0b", "needs-info": "d4c5f9", ready: "0e8a16" };
-  for (const label of labels) {
+  const standard = ["area:ui", "area:roadmap", "area:backend", "area:data", "area:release", "risk:low", "risk:medium", "risk:high", "ai:needs-info", "ai:ready", "ai:in-progress", "ai:blocked", "ai:review"];
+  for (const label of [...new Set([...standard, ...labels])]) {
     const exists = await fetch(apiBase + "/repos/" + repository + "/labels/" + encodeURIComponent(label), { headers });
     if (exists.status === 404) {
       const suffix = label.split(":")[1] || "ui";
