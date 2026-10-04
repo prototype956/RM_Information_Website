@@ -18,11 +18,11 @@ const LEVELS = {
 };
 
 function normalise(value) {
-  return String(value || "").replaceAll("\\\\", "/").replace(/^\\.\\//, "");
+  return String(value || "").replaceAll(String.fromCharCode(92), "/").replace(/^\.\//, "");
 }
 
 export function slugify(value) {
-  const slug = normalise(value).toLowerCase().replace(/[^a-z0-9\\u4e00-\\u9fff]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = normalise(value).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
   return slug.slice(0, 48) || "issue";
 }
 
@@ -96,7 +96,7 @@ export function canAutoMerge({ paths = [], labels = [], checks = [], aiFindings 
   const result = classifyPaths(paths);
   const names = labels.map((label) => typeof label === "string" ? label : label.name);
   const checksPass = checks.every((check) => ["success", "neutral", "skipped"].includes(check));
-  const cleanAi = aiFindings.every((finding) => !/\\bP[01]\\b|BLOCKING/i.test(String(finding)));
+  const cleanAi = aiFindings.every((finding) => !/\bP[01]\b|BLOCKING/i.test(String(finding)));
   return result.level === "L0" && result.autoMerge && !result.protected &&
     names.includes("risk:low") && names.includes("ai:reviewed") &&
     checksPass && cleanAi && unresolvedThreads === 0 && issueReady &&
