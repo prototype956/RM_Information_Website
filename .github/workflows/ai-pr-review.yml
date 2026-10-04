@@ -15,6 +15,7 @@ permissions:
 jobs:
   review:
     if: >
+      vars.AI_MODEL != '' &&
       github.actor != 'github-actions[bot]' &&
       (
         (github.event_name == 'pull_request' &&
@@ -50,3 +51,22 @@ jobs:
             catch { await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, name, color: '1d76db' }); }
             const number = context.payload.pull_request?.number || context.issue.number;
             if (number) await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: number, labels: [name] });
+
+  configuration:
+    if: vars.AI_MODEL == ''
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const number = context.payload.pull_request?.number || context.issue.number;
+            if (!number) return;
+            const marker = '<!-- ai-review-config -->';
+            const body = marker + '\nAI Review 已跳过：仓库尚未配置 AI_MODEL。确定性 CI 仍会运行；配置模型变量和 AI_API_KEY 后可评论 @agent review 重新触发。';
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number: number, per_page: 100 });
+            const old = comments.find(comment => (comment.body || '').includes(marker));
+            if (old) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: number, body });
