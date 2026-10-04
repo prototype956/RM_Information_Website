@@ -1,0 +1,44 @@
+version: 1
+branch_prefix: bot/issue-
+max_iterations: 6
+protected_paths:
+  - .github/**
+  - AGENTS.md
+  - package.json
+  - package-lock.json
+  - db/**
+  - drizzle/**
+  - server/**
+  - cloud/**
+  - wrangler.jsonc
+levels:
+  L0:
+    description: Local presentation-only UI changes
+    allowed_paths:
+      - src/**/*.css
+      - src/components/ui/**
+    auto_merge: true
+  L1:
+    description: Pages, roadmap and interaction changes
+    allowed_paths:
+      - src/pages/**
+      - src/roadmaps/**
+      - src/components/**
+    auto_merge: false
+  L2:
+    description: Runtime, data, authentication and permissions
+    allowed_paths:
+      - server/**
+      - cloud/**
+      - db/**
+      - drizzle/**
+    auto_merge: false
+  L3:
+    description: Repository and deployment governance
+    allowed_paths:
+      - .github/**
+      - package.json
+      - package-lock.json
+      - wrangler.jsonc
+      - AGENTS.md
+    auto_merge: false

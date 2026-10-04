@@ -1,0 +1,52 @@
+name: AI Issue Implement
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  implement:
+    if: >
+      (
+        (github.event_name == 'issues' && github.event.label.name == 'ai:ready') ||
+        (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@agent implement'))
+      ) &&
+      (github.event.issue.user.login == github.actor ||
+       github.event.issue.author_association == 'OWNER' ||
+       github.event.issue.author_association == 'MEMBER' ||
+       github.event.issue.author_association == 'COLLABORATOR') &&
+      !contains(github.event.issue.labels.*.name, 'ai:needs-info') &&
+      !contains(github.event.issue.labels.*.name, 'risk:high') &&
+      !contains(github.event.issue.labels.*.name, 'area:release')
+    runs-on: ubuntu-latest
+    environment: ai-implementation
+    timeout-minutes: 90
+    concurrency:
+      group: ai-implement-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          cache: npm
+      - name: Generate, validate and test a bounded patch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+          OPENHANDS_MAX_ITER: "6"
+        run: node scripts/ai/implement.mjs

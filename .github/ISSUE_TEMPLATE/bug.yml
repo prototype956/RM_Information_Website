@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible problem in the website
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove secrets and personal data from screenshots and logs.
+  - type: input
+    id: route
+    attributes:
+      label: Page or route
+      placeholder: /roadmaps
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - UI
+        - roadmap
+        - data
+        - backend
+        - release
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: State how a reviewer can verify the fix.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or console output
+      description: Optional. Redact tokens and personal data.

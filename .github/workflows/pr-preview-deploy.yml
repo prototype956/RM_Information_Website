@@ -1,0 +1,42 @@
+name: PR Preview Deploy
+
+on:
+  workflow_run:
+    workflows: ["PR Preview Build"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317
+        with:
+          name: pr-preview-${{ github.event.workflow_run.pull_requests[0].number }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PREVIEW_URL: ${{ vars.PREVIEW_URL }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.workflow_run.pull_requests?.[0];
+            if (!pr) return;
+            const marker = '<!-- ai-preview -->';
+            const text = process.env.PREVIEW_URL
+              ? marker + '\\n预览地址：' + process.env.PREVIEW_URL + '\\n构建 artifact 已从受信任 workflow_run 下载。'
+              : marker + '\\n预览构建已完成，artifact 已生成；仓库尚未配置 PREVIEW_URL 或预览提供商，因此暂不自动发布到外部环境。';
+            const comments = await github.paginate(github.rest.issues.listComments, { owner: context.repo.owner, repo: context.repo.repo, issue_number: pr.number, per_page: 100 });
+            const old = comments.find(comment => (comment.body || '').includes(marker));
+            if (old) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: old.id, body: text });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: pr.number, body: text });
