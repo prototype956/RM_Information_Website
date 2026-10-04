@@ -1,0 +1,10 @@
+# Governance, runtime and data changes require repository owner review
+.github/ @prototype956
+db/ @prototype956
+drizzle/ @prototype956
+cloud/ @prototype956
+server/ @prototype956
+AGENTS.md @prototype956
+package.json @prototype956
+package-lock.json @prototype956
+wrangler.jsonc @prototype956

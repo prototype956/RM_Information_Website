@@ -1,0 +1,52 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, labeled]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    if: >
+      github.actor != 'github-actions[bot]' &&
+      (
+        (github.event_name == 'pull_request' &&
+          (github.event.action != 'labeled' || github.event.label.name == 'ai:review')) ||
+        (github.event_name == 'issue_comment' &&
+          startsWith(github.event.comment.body, '@agent review'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: the-pr-agent/pr-agent@cdde12552d6f40e24aff4949801cae2a8e5230c2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.AI_API_KEY }}
+          OPENAI_API_BASE: ${{ vars.AI_BASE_URL }}
+          CONFIG__MODEL: ${{ vars.AI_MODEL }}
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: "true"
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: "false"
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: "false"
+          GITHUB_ACTION_CONFIG__HANDLE_PUSH_TRIGGER: "false"
+          PR_REVIEWER__EXTRA_INSTRUCTIONS: |
+            Review Issue acceptance criteria, roadmap drag and arrange behavior, learning-material navigation,
+            mobile layout, keyboard focus, prefers-reduced-motion, missing tests, protected paths, and
+            permission or data regressions. P0 means security, data loss, authentication bypass or
+            production outage. P1 means a clear regression or unmet acceptance criterion. Ordinary
+            suggestions are comments only.
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const name = 'ai:reviewed';
+            try { await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name }); }
+            catch { await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, name, color: '1d76db' }); }
+            const number = context.payload.pull_request?.number || context.issue.number;
+            if (number) await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: number, labels: [name] });
