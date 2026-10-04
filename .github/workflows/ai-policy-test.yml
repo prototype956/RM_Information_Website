@@ -23,4 +23,7 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
+      - run: node --check scripts/ai/policy.mjs
+      - run: node --check scripts/ai/issue-triage.mjs
+      - run: node --check scripts/ai/implement.mjs
       - run: node --test tests/ai-policy.test.mjs
